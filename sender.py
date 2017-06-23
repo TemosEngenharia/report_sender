@@ -1,0 +1,105 @@
+#!/opt/virtualenvs/report_sender/bin/python
+import io
+import odoorpc
+import smtplib
+import base64
+import mimetypes
+import PyPDF2 as pypdf2
+from sys import argv
+from email import encoders
+from os.path import basename
+from email.message import Message
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+
+_id = int(argv[1])
+
+
+#Gerar report
+odoo = odoorpc.ODOO('localhost', port=8069)
+odoo.login('odoo_prd', 'admin', 'tw28()KPvp+-45XW')
+
+_posto_cod = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_task_customer_number']
+    )[0]['mco_task_customer_number']
+
+_posto_name = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_task_customer_name']
+    )[0]['mco_task_customer_name']
+
+_report_name = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_name']
+    )[0]['mco_form_name']
+
+_inc_number = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_task_request_number']
+    )[0]['mco_task_request_number']
+
+_inc_date_time = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_date_time']
+    )[0]['mco_form_date_time']
+_inc_date = _inc_date_time.split(' ')[0].split('-')
+_inc_time = _inc_date_time.split(' ')[1].split(':')
+inc_date_time = "%s%s%s_%s%s%s" % (_inc_date[0], _inc_date[1], _inc_date[2],
+    _inc_time[0], _inc_time[1], _inc_time[2])
+
+_pista1 = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_first_line_flag']
+    )[0]['mco_form_station_first_line_flag']
+_pista2 = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_sec_line_flag']
+    )[0]['mco_form_station_sec_line_flag']
+_server = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_server_flag']
+    )[0]['mco_form_station_server_flag']
+_teto = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_roof_flag']
+    )[0]['mco_form_station_roof_flag']
+_equip = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_roof_flag']
+    )[0]['mco_form_station_roof_flag']
+
+report = pypdf2.PdfFileWriter()
+
+r_capa = pypdf2.PdfFileReader(odoo.report.download('mcor_capa', [_id]))
+report.appendPagesFromReader(r_capa)
+
+r_resumo = pypdf2.PdfFileReader(odoo.report.download('mcor_resumo', [_id]))
+report.appendPagesFromReader(r_resumo)
+
+r_posto = pypdf2.PdfFileReader(odoo.report.download('mcor_posto', [_id]))
+report.appendPagesFromReader(r_posto)
+
+if _pista1 == 1 or _pista2 == 1:
+    r_pistas = pypdf2.PdfFileReader(odoo.report.download('mcor_pistas', [_id]))
+    report.appendPagesFromReader(r_pistas)
+
+if _server == 1:
+    r_servidor = pypdf2.PdfFileReader(odoo.report.download('mcor_servidor', [_id]))
+    report.appendPagesFromReader(r_servidor)
+
+if _equip == 1:
+    r_equipamentos = pypdf2.PdfFileReader(odoo.report.download('mcor_equipamentos', [_id]))
+    report.appendPagesFromReader(r_equipamentos)
+
+filename = '/opt/files/reports/mco/MCO_%s_%s_%s.pdf' % (inc_date_time, _posto_cod, _inc_number)
+with open(filename, 'wb') as pdf_file:
+    report.write(pdf_file)
+
+
+# Evio do email
+subject = '[%s] %s em %s - %s' % (_inc_number, _report_name, _posto_cod, _posto_name)
+sender = 'reports@mg.temos.net'
+senha = 'ZOJ52rbVwV2Wiks8'
+receiver = 'report_abastce@mg.temos.net'
+
+outer = MIMEMultipart()
+outer['Subject'] = subject
+outer['To'] = receiver
+outer['From'] = sender
+outer.preamble= 'You will not see this in a MIME-aware mail reader.\n'
+
+with open(filename, 'rb') as pdf_file:
+    part = MIMEApplication(pdf_file.read(), Name=basename(filename))
+    part['Content-Disposition'] = 'attachment; filename="%s"' % basename(filename)
+    outer.attach(part)
+
+compose = outer.as_string().encode('utf-8')
+
+server = smtplib.SMTP('smtp.mailgun.com', 587)
+server.ehlo()
+server.starttls()
+server.ehlo()
+server.login(sender, senha)
+server.sendmail(sender, receiver, compose)
+server.close
