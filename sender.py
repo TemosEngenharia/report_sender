@@ -85,7 +85,7 @@ for _id in mco_ids:
     outer['Subject'] = subject
     outer['To'] = receiver
     outer['From'] = sender
-    outer.preamble = 'You will not see this in a MIME-aware mail reader.\n'
+    outer.preamble = 'You will not see this in a MIME-aware mail reader.'
 
     with open(filename, 'rb') as pdf_file:
         part = MIMEApplication(pdf_file.read(), Name = basename(filename))
