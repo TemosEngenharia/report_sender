@@ -1,7 +1,9 @@
 #!/opt/virtualenvs/report_sender/bin/python
+from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from os.path import basename
+import base64
 import smtplib
 
 import odoorpc
@@ -13,7 +15,6 @@ odoo = odoorpc.ODOO('localhost', port = 8069)
 odoo.login('odoo_prd', 'admin', 'tw28()KPvp+-45XW')
 
 mco = odoo.env['mcorretiva.mco_form']
-
 mco_ids = mco.search([('mco_form_report_flag', '=', False)])
 
 for _id in mco_ids:
@@ -44,8 +45,8 @@ for _id in mco_ids:
         )[0]['mco_form_station_server_flag']
     _teto = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_roof_flag']
         )[0]['mco_form_station_roof_flag']
-    _equip = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_roof_flag']
-        )[0]['mco_form_station_roof_flag']
+    _equip = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_equipment_flag']
+        )[0]['mco_form_station_equipment_flag']
 
     report = pypdf2.PdfFileWriter()
 
@@ -76,25 +77,30 @@ for _id in mco_ids:
 
 
     # Evio do email
-    subject = '[%s] %s em %s - %s' % (_inc_number, _report_name, _posto_cod, _posto_name)
-    sender = 'reports@mg.temos.net'
-    senha = 'ZOJ52rbVwV2Wiks8'
-    receiver = 'report_abastce@mg.temos.net'
+    subject = '%s - %s | %s | %s' % (_posto_cod, _posto_name, _inc_number, _report_name)
+    sender = 'services@temos.net'
+    senha = '20F836xhCjPeLGxP'
+    #receiver = 'reports.abastece@temos.net'
+    receiver = 'cezar.santanna@gmail.com'
+    body = 'Report from Temos Engenharia'
 
-    outer = MIMEMultipart()
-    outer['Subject'] = subject
-    outer['To'] = receiver
-    outer['From'] = sender
-    outer.preamble = 'You will not see this in a MIME-aware mail reader.\n'
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = receiver
+    msg['Subject'] = subject
 
-    with open(filename, 'rb') as pdf_file:
-        part = MIMEApplication(pdf_file.read(), Name = basename(filename))
-        part['Content-Disposition'] = 'attachment; filename="%s"' % basename(filename)
-        outer.attach(part)
+    msg.attach(MIMEText(body, 'plain', 'utf-8'))
+    print(msg)
 
-    compose = outer.as_string().encode('utf-8')
+    with open(filename, 'rb') as attachment:
+        attach = MIMEApplication(attachment.read(), Name = basename(filename))
+        attach['Content-Disposition'] = 'attachment; filename="%s"' % basename(filename)
+        msg.attach(attach)
+        print(msg)
 
-    server = smtplib.SMTP('smtp.mailgun.com', 587)
+    compose = msg.as_string().encode('utf-8')
+
+    server = smtplib.SMTP('smtp.office365.com', 587)
     server.ehlo()
     server.starttls()
     server.ehlo()
