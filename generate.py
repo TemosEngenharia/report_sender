@@ -48,9 +48,6 @@ for _id in mco_ids:
     _equip = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_equipment_flag']
         )[0]['mco_form_station_equipment_flag']
 
-    _stationMail = odoo.execute('mcorretiva.mco_form', 'read', [_id], ['mco_form_station_responsible_email']
-        )[0]['mco_form_station_responsible_email']
-
     report = pypdf2.PdfFileWriter()
 
     r_capa = pypdf2.PdfFileReader(odoo.report.download('mcor_capa', [_id]))
@@ -77,38 +74,5 @@ for _id in mco_ids:
     filename = '/opt/files/reports/mco/MCO_%s_%s_%s.pdf' % (inc_date_time, _posto_cod, _inc_number)
     with open(filename, 'wb') as pdf_file:
         report.write(pdf_file)
-
-
-    # Evio do email
-    subject = '%s - %s | %s | %s' % (_posto_cod, _posto_name, _inc_number, _report_name)
-    sender = 'services@temos.net'
-    senha = '20F836xhCjPeLGxP'
-    receiver = 'reports.abastece@temos.net'
-    body = 'Report from Temos Engenharia\r'
-
-    msg = MIMEMultipart()
-    msg['From'] = sender
-    msg['To'] = receiver
-    msg['Subject'] = subject
-
-    msg.attach(MIMEText(body, 'plain', 'utf-8'))
-
-    with open(filename, 'rb') as attachment:
-        attach = MIMEApplication(attachment.read(), Name = basename(filename))
-        attach['Content-Disposition'] = 'attachment; filename="%s"' % basename(filename)
-        msg.attach(attach)
-
-    compose = msg.as_string().encode('utf-8')
-
-    server = smtplib.SMTP('smtp.office365.com', 587)
-    server.set_debuglevel(True)
-    server.ehlo()
-    server.starttls()
-    server.ehlo()
-    server.login(sender, senha)
-    server.send_message(msg, sender, receiver)
-    if '@' in _stationMail:
-        server.send_message(msg, sender, _stationMail)
-    server.close
 
     mco.write([_id], {'mco_form_report_flag': True})
